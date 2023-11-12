@@ -74,70 +74,19 @@ class App:
 
     def submit_clicked(self, e):
         if self.dropdown.value == "html":
-            self.convert_md_to_html()
+            for archivo in self.archivos:
+                url_descarga = f'http://localhost:8000/markdown-to-html/{archivo}'
+                respuesta = requests.get(url_descarga)
+
+                with open(f'{archivo}.html', 'wb') as f:
+                    f.write(respuesta.content)
         elif self.dropdown.value == "pdf":
-            self.convert_md_to_pdf()
+            for archivo in self.archivos:
+                url_descarga = f'http://localhost:8000/markdown-to-pdf/{archivo}'
+                respuesta = requests.get(url_descarga)
 
-    def convert_md_to_html(self):
-        # Crear la carpeta 'downloads' si no existe
-        carpeta_descargas = 'downloads'
-        os.makedirs(carpeta_descargas, exist_ok=True)
-
-        for archivo in self.archivos:
-            # Obtener el contenido del archivo Markdown desde el servidor
-            response = requests.get(f'http://localhost:8000/upload/{archivo}')
-
-            if response.status_code == 200:
-                # Convertir el contenido de Markdown a HTML
-                contenido_markdown = response.text
-                contenido_html = markdown.markdown(contenido_markdown)
-
-                # Guardar el contenido HTML en un archivo en la carpeta 'downloads'
-                archivo_html = os.path.join(carpeta_descargas, f'{archivo.replace(".md", ".html")}')
-                with open(archivo_html, 'w', encoding='utf-8') as archivo_salida:
-                    archivo_salida.write(contenido_html)
-
-                print(f"Contenido HTML para {archivo} guardado en {archivo_html}")
-            else:
-                print(f"Error al obtener el archivo {archivo}. Estado de la respuesta: {response.status_code}")
-
-    def convert_md_to_pdf(self):
-        for archivo in self.archivos:
-            # Obtener el contenido del archivo Markdown desde el servidor
-            url_archivo = f'http://localhost:8000/upload/{archivo}'
-            response = requests.get(url_archivo)
-
-            if response.status_code == 200:
-                # Crea un archivo temporal
-                temp = tempfile.NamedTemporaryFile(delete=False)
-
-                try:
-                    # Escribe el contenido de Markdown en el archivo temporal
-                    with open(temp.name, 'w', encoding='utf-8') as f:
-                        f.write(response.text)
-
-                    # Convertir el archivo de Markdown a PDF usando Pandoc
-                    archivo_pdf = os.path.join("downloads", f'{archivo.replace(".md", ".pdf")}')
-                    self.convert_md_to_pdf_with_pandoc(temp.name, archivo_pdf)
-                    print(f"Contenido PDF para {archivo} guardado en {archivo_pdf}")
-                except Exception as e:
-                    traceback.print_exc()
-                    print(f"Error al convertir {archivo} a PDF. Detalles del error:\n{e}")
-                finally:
-                    # Cierra el archivo temporal antes de intentar eliminarlo
-                    temp.close()
-                    # Elimina el archivo temporal
-                    os.unlink(temp.name)
-            else:
-                traceback.print_exc()
-                print(
-                    f"Error al obtener el archivo {archivo} desde {url_archivo}. Estado de la respuesta: {response.status_code}")
-
-    def convert_md_to_pdf_with_pandoc(self, input_file, output_file):
-        try:
-            subprocess.run(["pandoc", input_file, "-o", output_file])
-        except Exception as e:
-            raise Exception(f"Error al convertir Markdown a PDF usando Pandoc. Detalles del error:\n{e}")
+                with open(f'{archivo}.pdf', 'wb') as f:
+                    f.write(respuesta.content)
 
 
 def main(page: Page):

@@ -1,20 +1,16 @@
 import os
-import subprocess
 import tempfile
 import time
-import traceback
-import flet
-import markdown
+import flet as ft
 import requests
 from flet import (
     ElevatedButton,
     FilePicker,
     FilePickerResultEvent,
     Page,
-    Text,
     icons,
     Dropdown,
-    FilePickerUploadFile
+    FilePickerUploadFile,
 )
 
 carpeta_temporal = tempfile.mkdtemp()
@@ -26,31 +22,93 @@ class App:
         self.file_picker = FilePicker()
         self.archivos = []
 
+        self.filter = ft.Tabs(
+            scrollable=False,
+            selected_index=0,
+            on_change=self.tabs_changed,
+            tabs=[ft.Tab(text="Upload files"), ft.Tab(text="Direct")],
+        )
+
+        self.page.add(self.filter)
+
         self.file_picker.on_result = self.file_picker_result
 
-        # hide dialog in a overlay
         self.page.overlay.append(self.file_picker)
-
-        self.page.add(
-            ElevatedButton(
-                "Seleccionar archivo...",
-                icon=icons.FOLDER_OPEN,
-                on_click=lambda _: self.file_picker.pick_files(allow_multiple=False),
-            ),
-        )
 
         # Añadir dropdown
         self.dropdown = Dropdown(
             width=100,
             options=[
-                flet.dropdown.Option("pdf"),
-                flet.dropdown.Option("html"),
+                ft.dropdown.Option("pdf"),
+                ft.dropdown.Option("html"),
             ],
         )
-        self.page.add(self.dropdown)
 
-        # Añadir botón submit
-        self.page.add(ElevatedButton(text="Submit", on_click=self.submit_clicked))
+        self.archivos_usados = None
+
+        self.page1 = ft.Column(
+            controls=[
+                ft.Row(
+                    [
+                        ft.Container(
+                            ft.Text(
+                                "Transformer",
+                                size=40,
+                                color=ft.colors.ON_SURFACE,
+                                weight=ft.FontWeight.W_100,
+                            ),
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft.Container(
+                            self.dropdown
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft.Container(
+                            ElevatedButton(
+                                "Seleccionar archivo...",
+                                icon=icons.FOLDER_OPEN,
+                                on_click=lambda _: self.file_picker.pick_files(allow_multiple=False),
+                            )
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft.Column(
+                            self.archivos_usados
+                        )
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft.Container(
+                            ElevatedButton(text="Submit", on_click=self.submit_clicked)
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                )
+            ]
+        )
+        self.page2 = ft.Text("Página 2", visible=False)
+
+        self.page.add(self.page1)
+        self.page.add(self.page2)
+
+    def tabs_changed(self, event):
+        self.page1.visible = not self.page1.visible
+        self.page2.visible = not self.page2.visible
+
+        self.page.update()
 
     def file_picker_result(self, e: FilePickerResultEvent):
         if e.files is not None:
@@ -69,10 +127,13 @@ class App:
                 # Enviar una solicitud al servidor para obtener el contenido del archivo
                 response = requests.get(f'http://localhost:8000/upload/{f.name}')
                 print(response.text)
-                self.page.add(Text(f"Nombre del archivo seleccionado: {f.name}"))
-        self.page.update()
+
+        self.archivos_usados = [ft.Text(f"Nombre del archivo seleccionado: {archivo}") for archivo in self.archivos]
+        self.page1.update()
+        print(self.archivos)
 
     def submit_clicked(self, e):
+
         if self.dropdown.value == "html":
             for archivo in self.archivos:
                 url_descarga = f'http://localhost:8000/markdown-to-html/{archivo}'
@@ -90,7 +151,8 @@ class App:
 
 
 def main(page: Page):
+    page.title = "Convertidor"
     app = App(page)
 
 
-flet.app(target=main, view=flet.WEB_BROWSER, upload_dir=carpeta_temporal)
+ft.app(target=main, view=ft.WEB_BROWSER, upload_dir=carpeta_temporal)

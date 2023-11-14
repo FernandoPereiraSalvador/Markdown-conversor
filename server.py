@@ -20,6 +20,7 @@ def upload_file():
 def download_file(filename):
     return send_from_directory('upload', filename)
 
+
 @app.route('/markdown-to-html/<filename>', methods=['GET'])
 def convert_to_html(filename):
     filepath = os.path.join("upload", filename)
@@ -41,6 +42,7 @@ def convert_to_html(filename):
     else:
         return f'Error: El archivo {filename} no existe'
 
+
 @app.route('/markdown-to-pdf/<filename>', methods=['GET'])
 def convert_to_pdf(filename):
     filepath = os.path.join("upload", filename)
@@ -61,7 +63,7 @@ def convert_to_pdf(filename):
 
             # Convertir el archivo de Markdown a PDF usando Pandoc
             archivo_pdf = os.path.join("downloads", f'{filename.replace(".md", ".pdf")}')
-            convert_md_to_pdf_with_pandoc(temp.name, archivo_pdf)
+            pandoc(temp.name, archivo_pdf)
             print(f"Contenido PDF para {filename} guardado en {archivo_pdf}")
 
             # Enviar el archivo PDF para su descarga
@@ -77,11 +79,13 @@ def convert_to_pdf(filename):
     else:
         return f'Error: El archivo {filename} no existe'
 
-def convert_md_to_pdf_with_pandoc(input_file, output_file):
+
+def pandoc(input_file, output_file):
     try:
         subprocess.run(["pandoc", input_file, "-o", output_file])
     except Exception as e:
         raise Exception(f"Error al convertir Markdown a PDF usando Pandoc. Detalles del error:\n{e}")
+
 
 if __name__ == '__main__':
     app.run(port=8000)

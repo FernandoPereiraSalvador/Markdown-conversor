@@ -44,7 +44,9 @@ class App:
             ],
         )
 
-        self.archivos_usados = None
+        self.archivos_usados = ft.Column(
+                            [ft.Text('')]
+                        )
 
         self.page1 = ft.Column(
             controls=[
@@ -52,7 +54,7 @@ class App:
                     [
                         ft.Container(
                             ft.Text(
-                                "Transformer",
+                                "Upload your markdown files",
                                 size=40,
                                 color=ft.colors.ON_SURFACE,
                                 weight=ft.FontWeight.W_100,
@@ -75,7 +77,7 @@ class App:
                             ElevatedButton(
                                 "Seleccionar archivo...",
                                 icon=icons.FOLDER_OPEN,
-                                on_click=lambda _: self.file_picker.pick_files(allow_multiple=False),
+                                on_click=lambda _: self.file_picker.pick_files(allow_multiple=True),
                             )
                         ),
                     ],
@@ -83,9 +85,7 @@ class App:
                 ),
                 ft.Row(
                     [
-                        ft.Column(
-                            self.archivos_usados
-                        )
+                        self.archivos_usados
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
@@ -99,10 +99,63 @@ class App:
                 )
             ]
         )
-        self.page2 = ft.Text("Página 2", visible=False)
+
+        self.direct = ft.TextField(multiline=True, width=300, height=400, min_lines=16, bgcolor=ft.colors.ON_BACKGROUND,
+                                             opacity=0.5,color=ft.colors.BACKGROUND)
+
+        self.page2 = ft.Column(
+            controls=[
+                ft.Container(
+                    ft.Row(
+                        [
+                            ft.Container(
+                                ft.TextField(multiline=True, width=300, height=400, min_lines=16,
+                                             on_change=self.direct_conversion, bgcolor=ft.colors.ON_BACKGROUND,
+                                             opacity=0.5,color=ft.colors.BACKGROUND),
+                                width=600,
+                                height=400,
+                            ),
+                            ft.Container(
+                                width=80,
+                            ),
+                            ft.Container(
+                                self.direct,
+                                width=600,
+                                height=400,
+                            )
+                        ],
+                        scroll=ft.ScrollMode.ALWAYS
+                    ),
+                    alignment=ft.alignment.center
+                ),
+            ],
+            visible=False
+        )
 
         self.page.add(self.page1)
         self.page.add(self.page2)
+
+    def direct_conversion(self,event):
+        text = event.control.value
+
+        with tempfile.NamedTemporaryFile(delete=False) as temp:
+            temp.write(text.encode())
+            temp_file_name = temp.name
+
+        with open(temp_file_name, 'rb') as f:
+            requests.post("http://localhost:8000/upload", files={'file': f})
+
+        # Obtiene el contenido del archivo en formato HTML
+        response = requests.get(f'http://localhost:8000/markdown-to-html/{temp_file_name}')
+        html_content = response.text
+
+        # Imprime el contenido en HTML
+        print(html_content)
+        self.direct.value = html_content
+        self.page.update()
+
+        # Elimina el archivo temporal
+        os.remove(temp_file_name)
 
     def tabs_changed(self, event):
         self.page1.visible = not self.page1.visible
@@ -113,6 +166,9 @@ class App:
     def file_picker_result(self, e: FilePickerResultEvent):
         if e.files is not None:
             for f in e.files:
+                print("FILES: " )
+                print(e.files)
+                print(f)
                 self.archivos.append(f.name)
                 # Subir el archivo al servidor
                 upload_url = self.page.get_upload_url(f.name, 60)
@@ -128,9 +184,13 @@ class App:
                 response = requests.get(f'http://localhost:8000/upload/{f.name}')
                 print(response.text)
 
-        self.archivos_usados = [ft.Text(f"Nombre del archivo seleccionado: {archivo}") for archivo in self.archivos]
-        self.page1.update()
-        print(self.archivos)
+            self.archivos_usados.clean()
+            for archivo in self.archivos:
+                self.archivos_usados.controls.append(
+                    ft.Text(f"Nombre del archivo seleccionado: {archivo}"))
+            self.archivos_usados.update()
+            self.page.update()
+            print(self.archivos)
 
     def submit_clicked(self, e):
 

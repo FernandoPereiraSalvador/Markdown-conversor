@@ -16,3 +16,5 @@ java -jar client-fat-jar.jar 127.0.0.1 usuari
 ```
 
 En principi, funcionen amb Linux. Amb windows no sé si funcionaran per compatibilitat amb les llibreries de javafx que porta incorporades en el jar.
+
+![Texto alternativo](C:\Users\TESTER\Downloads\cloud.png)

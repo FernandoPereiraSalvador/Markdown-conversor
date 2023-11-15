@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import time
 import flet as ft
@@ -183,6 +184,7 @@ class App:
                 # Enviar una solicitud al servidor para obtener el contenido del archivo
                 response = requests.get(f'http://localhost:8000/upload/{f.name}')
                 print(response.text)
+                self.upload_images_from_markdown(response.text)
 
             self.archivos_usados.clean()
             for archivo in self.archivos:
@@ -192,6 +194,27 @@ class App:
             self.page.update()
             print(self.archivos)
 
+    def upload_images_from_markdown(self,markdown_content):
+        # Expresión regular para buscar imágenes en Markdown
+        image_regex = r'!\[.*?\]\((.*?)\)'
+
+        # Buscar todas las imágenes en el contenido de Markdown
+        images = re.findall(str(image_regex), str(markdown_content))
+        print(images)
+        # Para cada imagen...
+        for image_path in images:
+            # Abrir la imagen en modo binario
+            with open(image_path, 'rb') as file:
+                # Obtener solo el nombre del archivo, sin la ruta completa
+                image_name = os.path.basename(image_path)
+                print(image_name)
+
+                # Enviar la imagen al servidor
+                response = requests.post('http://localhost:8000/upload', files={'file': (image_name, file)})
+
+                # Imprimir la respuesta del servidor
+                print(response.text)
+                print('SE HA SUBIDO UNA IMAGEN')
     def submit_clicked(self, e):
 
         if self.dropdown.value == "html":

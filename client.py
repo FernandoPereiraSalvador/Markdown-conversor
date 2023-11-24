@@ -2,6 +2,7 @@ import os
 import re
 import tempfile
 import time
+
 import flet as ft
 import requests
 from flet import (
@@ -14,11 +15,15 @@ from flet import (
     FilePickerUploadFile,
 )
 
-carpeta_temporal = tempfile.mkdtemp()
+from client_constantes import IP, PORT
+
+CARPETA_TEMPORAL = tempfile.mkdtemp()
 
 
 class App:
     def __init__(self, page):
+
+        # Inicialización de atributos
         self.page = page
         self.file_picker = FilePicker()
         self.archivos = []
@@ -30,6 +35,8 @@ class App:
             tabs=[ft.Tab(text="Upload files"), ft.Tab(text="Direct")],
         )
 
+        # Crea elementos de la interfaz grafica para tener una referencia
+
         self.page.add(self.filter)
 
         self.file_picker.on_result = self.file_picker_result
@@ -39,12 +46,16 @@ class App:
         self.submit = ElevatedButton(text="Submit", on_click=self.submit_clicked,
                                      disabled=True)
 
-        self.barra_progreso = ft.ProgressBar(width=250, color="blue", bgcolor="#eeeeee", visible=False)
+        self.barra_progreso_archivos = ft.ProgressBar(width=250, color="blue", bgcolor="#eeeeee", visible=False)
+        self.barra_progreso_render = ft.ProgressBar(width=250, color="blue", bgcolor="#eeeeee", visible=False)
+        self.barra_progreso_transform = ft.ProgressBar(width=250, color="blue", bgcolor="#eeeeee", visible=False)
 
-        # Añadir dropdown
+        self.boton_render = ft.Container(
+                                ft.ElevatedButton('Render HTML', on_click=lambda event: self.abrir_url())
+                            )
+
         self.dropdown = Dropdown(
             width=100,
-            height=100,
             options=[
                 ft.dropdown.Option("pdf"),
                 ft.dropdown.Option("html"),
@@ -55,6 +66,11 @@ class App:
             [ft.Text('')]
         )
 
+        self.direct = ft.TextField(multiline=True, width=300, height=400, min_lines=16, bgcolor=ft.colors.ON_BACKGROUND,
+                                   opacity=0.5, color=ft.colors.BACKGROUND)
+
+
+        # Configuración de la interfaz para "Upload files"
         self.page1 = ft.Column(
             controls=[
                 ft.Row(
@@ -90,14 +106,14 @@ class App:
                 ),
                 ft.Row(
                     [
-                        self.barra_progreso
+                        self.barra_progreso_archivos
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
                 ft.Row(
                     [
                         ft.Container(
-                            self.dropdown
+                            self.dropdown,
                         )
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -109,13 +125,19 @@ class App:
                         ),
                     ],
                     alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft.Container(
+                            self.barra_progreso_transform
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
                 )
             ]
         )
 
-        self.direct = ft.TextField(multiline=True, width=300, height=400, min_lines=16, bgcolor=ft.colors.ON_BACKGROUND,
-                                   opacity=0.5, color=ft.colors.BACKGROUND)
-
+        # Configuración de la interfaz para "Direct"
         self.page2 = ft.Column(
             controls=[
                 ft.Container(
@@ -136,11 +158,34 @@ class App:
                                 width=600,
                                 height=400,
                             ),
-                            ft.Container(
-                                ft.ElevatedButton('Enviar HTML', on_click=lambda event: self.abrir_url())
-                            )
+
                         ],
                         scroll=ft.ScrollMode.ALWAYS
+                    ),
+                    alignment=ft.alignment.center
+                ),
+                ft.Container(
+                    ft.Row(
+                        [
+                            ft.Container(
+                                width=950,
+                            ),
+                            ft.Container(
+                                self.barra_progreso_render,
+                            ),
+                        ]
+                    ),
+                    alignment=ft.alignment.center
+                ),
+                ft.Container(
+                    ft.Row(
+                        [
+                            ft.Container(
+                                width=1000,
+                            ),
+                            self.boton_render
+
+                        ]
                     ),
                     alignment=ft.alignment.center
                 ),
@@ -152,155 +197,250 @@ class App:
         self.page.add(self.page2)
 
     def abrir_url(self):
+        """
+        Abre el html generado a partir del código que ha introducido el usuario en la ventana direct
+        :return:
+        """
+
+        # Activa la barra de progreso y actualiza la interfaz gráfica
+        self.barra_progreso_render.visible = True
+        self.page.update()
+
+        # Obtiene el contenido HTML del área designada
         value = self.direct.value
 
         # Crea un archivo temporal con el nombre "mi_pagina" y extensión ".html"
         temp = tempfile.NamedTemporaryFile(prefix="mi_pagina", suffix=".html", delete=False)
 
+        # Guarda el contenido HTML en el archivo temporal
         with open(temp.name, 'wb') as f:
             f.write(value.encode())
 
         # Proporciona un nombre específico al enviar el archivo al servidor
         files = {'file': ('mi_pagina.html', open(temp.name, 'rb'))}
-        requests.post("http://localhost:8000/upload", files=files)
+        requests.post(f"http://{IP}:{PORT}/upload", files=files)
 
-        url_descarga = f'http://localhost:8000/markdown-to-html/mi_pagina.html'
+        # Obtiene la URL de descarga
+        url_descarga = f'http://{IP}:{PORT}/markdown-to-html/mi_pagina.html'
         respuesta = requests.get(url_descarga)
 
         # Verifica si la solicitud fue exitosa (código de estado 200)
         if respuesta.status_code == 200:
-            self.page.launch_url("http://localhost:8000/mi_pagina.html")
+            self.page.launch_url(f"http://{IP}:{PORT}/mi_pagina.html")
         else:
             print(f"Error al descargar la URL. Código de estado: {respuesta.status_code}")
 
+        # Desactiva la barra de progreso y actualiza la interfaz gráfica
+        self.barra_progreso_render.visible = False
+        self.page.update()
+
     def direct_conversion(self, event):
+        """
+         Realiza una conversión directa del contenido Markdown a HTML en directo
+
+        :param event: El objeto de evento asociado al evento de conversión directa.
+        :return: None
+        """
+
+        # Activa la barra de progreso y deshabilita el botón de renderización
+        self.barra_progreso_render.visible = True
+        self.boton_render.disabled = True
+        self.page.update()
+
+        # Obtiene el codigo markdown que ha introducido el usuario
         text = event.control.value
 
+        # Guarda temporalmente el contenido como un archivo Markdown
         with tempfile.NamedTemporaryFile(delete=False) as temp:
             temp.write(text.encode())
             temp_file_name = temp.name
 
+        # Sube el archivo al servidor
         with open(temp_file_name, 'rb') as f:
-            requests.post("http://localhost:8000/upload", files={'file': f})
+            requests.post(f"http://{IP}:{PORT}/upload", files={'file': f})
 
         # Obtiene el contenido del archivo en formato HTML
-        response = requests.get(f'http://localhost:8000/markdown-to-html/{temp_file_name}')
+        response = requests.get(f'http://{IP}:{PORT}/markdown-to-html-direct/{temp_file_name}')
         html_content = response.text
 
         # Imprime el contenido en HTML
-        print(html_content)
         self.direct.value = html_content
         self.page.update()
 
         # Elimina el archivo temporal
         os.remove(temp_file_name)
 
+        # Desactiva la barra de progreso y habilita el botón de renderización
+        self.barra_progreso_render.visible = False
+        self.boton_render.disabled = False
+        self.page.update()
+
     def tabs_changed(self, event):
+        """
+        Maneja el cambio de pestañas entre la pagina para subir archivos y la de direct
+        :param event: El objeto de evento asociado al cambio de pestañas.
+        :return: None
+        """
         self.page1.visible = not self.page1.visible
         self.page2.visible = not self.page2.visible
 
         self.page.update()
 
     def file_picker_result(self, e: FilePickerResultEvent):
+        """
+        Maneja el resultado de la selección de archivos a través de un FilePicker.
+
+        :param e: El objeto de evento asociado al cambio de pestañas.
+        :return: None
+        """
+        # Verifica si se han seleccionado archivos
         if e.files is not None:
+            # Itera los archivos seleccionados
             for f in e.files:
+                # Comprueba si es un archivo markdwon
                 if os.path.splitext(f.name)[1].lower() in ['.md', '.markdown', '.mdown']:
-                    self.barra_progreso.visible = True
+
+                    # Muestra la barra de progreso y deshabilita el botón de envío
+                    self.barra_progreso_archivos.visible = True
+                    self.submit.disabled = True
                     self.page.update()
-                    print("FILES: ")
-                    print(e.files)
-                    print(f)
+
+                    # Añade el nombre del archivo a la lista de archivos
                     self.archivos.append(f.name)
-                    # Subir el archivo al servidor
+
+                    # Sube el archivo al servidor
                     upload_url = self.page.get_upload_url(f.name, 60)
                     upload_file = FilePickerUploadFile(f.name, upload_url)
                     self.file_picker.upload([upload_file])
-                    print(carpeta_temporal)
-                    archivo_en_carpeta = os.path.join(carpeta_temporal, f.name)
-                    print(r"Ruta del archivo:", archivo_en_carpeta)
+
+                    # Obtiene la ruta de la carpeta temporal
+                    archivo_en_carpeta = os.path.join(CARPETA_TEMPORAL, f.name)
+
+                    # Esperamos 1 segundo a que el archivo temporal este creado
                     time.sleep(1)
+
+                    # Abre el archivo en modo binario y lo envía al servidor
                     with open(archivo_en_carpeta, 'rb') as file:
-                        requests.post("http://localhost:8000/upload", files={'file': file})
+                        requests.post(f"http://{IP}:{PORT}/upload", files={'file': file})
+
                     # Enviar una solicitud al servidor para obtener el contenido del archivo
-                    response = requests.get(f'http://localhost:8000/upload/{f.name}')
-                    print(response.text)
+                    response = requests.get(f'http://{IP}:{PORT}/upload/{f.name}')
+
+                    # Realiza el manejo de las imágenes en el contenido markdown
                     self.upload_images_from_markdown(response.text)
-                    self.barra_progreso.visible = False
+
+                    # Oculta la barra de progreso y habilita el botón de envío
+                    self.barra_progreso_archivos.visible = False
                     self.submit.disabled = False
                     self.page.update()
 
+                    # Actualiza la interfaz
                     self.archivos_usados.clean()
-                    self.añadir_nombres_archivos()
-
+                    self.anadir_nombres_archivos()
                     self.archivos_usados.update()
                     self.page.update()
-                    print(self.archivos)
 
                 else:
+                    # Muestra un mensaje indicando que no es un archivo markdown
                     self.archivos_usados.clean()
                     self.archivos_usados.controls.append(
                         ft.Text(f"No es un archivo markdown: {f.name}", color=ft.colors.RED))
                     self.archivos_usados.update()
                     self.page.update()
 
-    def añadir_nombres_archivos(self):
+    def anadir_nombres_archivos(self):
+        """
+        Añade los nombres de los archivos al contenedor `archivos_usados` y actualiza la interfaz gráfica.
+
+        Cuando se hace click sobre uno se borra y actualiza la interfaz gráfica de forma recursiva
+        :return: None
+        """
+        # Limpia el contenedor de archivos usados
         self.archivos_usados.clean()
+
+        # Iteremos a traves de archivos
         for archivo2 in self.archivos:
             button = ft.TextButton(f"Nombre del archivo seleccionado: {archivo2}")
             button.on_click = (lambda event, archivo=archivo2: (
                 self.archivos.remove(archivo),
                 self.archivos_usados.clean(),
-                self.añadir_nombres_archivos(),
+                self.anadir_nombres_archivos(),
                 self.archivos_usados.update(),
                 self.page.update()
             ))
             self.archivos_usados.controls.append(button)
 
     def upload_images_from_markdown(self, markdown_content):
+        """
+        Sube las imágenes encontradas en el contenido de Markdown al servidor.
+
+        :param markdown_content: El contenido de Markdown que contiene las imágenes.
+        :return: None
+
+        """
         # Expresión regular para buscar imágenes en Markdown
         image_regex = r'!\[.*?\]\((.*?)\)'
 
         # Buscar todas las imágenes en el contenido de Markdown
         images = re.findall(str(image_regex), str(markdown_content))
-        print(images)
-        # Para cada imagen...
+
+        # Iterar a traves de imagenes
         for image_path in images:
+
             # Abrir la imagen en modo binario
             with open(image_path, 'rb') as file:
+
                 # Obtener solo el nombre del archivo, sin la ruta completa
                 image_name = os.path.basename(image_path)
                 print(image_name)
 
                 # Enviar la imagen al servidor
-                response = requests.post('http://localhost:8000/upload', files={'file': (image_name, file)})
+                response = requests.post(f'http://{IP}:{PORT}/upload', files={'file': (image_name, file)})
 
-                # Imprimir la respuesta del servidor
-                print(response.text)
-                print('SE HA SUBIDO UNA IMAGEN')
 
     def submit_clicked(self, e):
+        """
+        Maneja el evento de clic en el botón de envío.
 
+        :param e: El objeto de evento asociado al clic del botón.
+        :return: None
+        """
+
+        # Hace visible la barra de progreso y actualiza la página.
+        self.barra_progreso_transform.visible = True
+        self.page.update()
+
+        # Comprueba el valor seleccionado en el menú desplegable.
         if self.dropdown.value == "html":
             for archivo in self.archivos:
-                url_descarga = f'http://localhost:8000/markdown-to-html/{archivo}'
+
+                # Itera sobre los archivos y realiza la conversión a HTML.
+                url_descarga = f'http://{IP}:{PORT}/markdown-to-html/{archivo}'
                 respuesta = requests.get(url_descarga)
 
-                self.page.launch_url(f"http://localhost:8000/mostrar-archivo/{archivo}.html")
+                # Abre la URL en el navegador para descargar el archivo HTML.
+                self.page.launch_url(f"http://{IP}:{PORT}/mostrar-archivo/{archivo}.html")
 
         elif self.dropdown.value == "pdf":
+            # Itera sobre los archivos y realiza la conversión a PDF.
             for archivo in self.archivos:
-                url_descarga = f'http://localhost:8000/markdown-to-pdf/{archivo}'
+                url_descarga = f'http://{IP}:{PORT}/markdown-to-pdf/{archivo}'
                 respuesta = requests.get(url_descarga)
-                print(url_descarga)
 
+                # Obtiene el nombre del archivo sin la extensión ".md".
                 nombre = archivo.replace(".md", "")
 
-                self.page.launch_url(f"http://localhost:8000/mostrar-archivo/{nombre}.pdf")
+                # Abre la URL en el navegador para descargar el archivo PDF.
+                self.page.launch_url(f"http://{IP}:{PORT}/mostrar-archivo/{nombre}.pdf")
+
+        # Oculta la barra de progreso y actualiza la página.
+        self.barra_progreso_transform.visible = False
+        self.page.update()
 
 
 def main(page: Page):
     page.title = "Convertidor"
-    app = App(page)
+    App(page)
 
 
-ft.app(target=main, view=ft.WEB_BROWSER, upload_dir=carpeta_temporal)
+ft.app(target=main, view=ft.WEB_BROWSER, upload_dir=CARPETA_TEMPORAL)

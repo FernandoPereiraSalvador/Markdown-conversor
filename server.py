@@ -86,7 +86,7 @@ def convert_to_html(filename):
         with open(filepath, 'r', encoding='utf-8') as file:
             contenido_markdown = file.read()
 
-        # Convertir Markdown a HTML
+        # Convertir Markdown - HTML
         contenido_html = markdown2.markdown(contenido_markdown)
 
         html_filepath = os.path.join("upload", f'{filename}.html')
@@ -118,7 +118,7 @@ def convert_to_html_direct(filename):
         with open(filepath, 'r', encoding='utf-8') as file:
             contenido_markdown = file.read()
 
-        # Convertir Markdown a HTML
+        # Convertir Markdown - HTML
         contenido_html = markdown2.markdown(contenido_markdown)
 
         # Enviar el archivo HTML para su descarga

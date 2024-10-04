@@ -18,7 +18,7 @@ from flet import (
 from client_constantes import IP, PORT
 
 CARPETA_TEMPORAL = tempfile.mkdtemp()
-
+os.environ['FLET_SECRET_KEY'] = 'secret'
 
 class App:
     def __init__(self, page):
@@ -443,4 +443,4 @@ def main(page: Page):
     App(page)
 
 
-ft.app(target=main, view=ft.WEB_BROWSER, upload_dir=CARPETA_TEMPORAL)
+ft.app(target=main, view=ft.AppView.WEB_BROWSER, upload_dir=CARPETA_TEMPORAL)
